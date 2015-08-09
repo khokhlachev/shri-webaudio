@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Web Starter Kit</title>
+
+    <!-- Page styles -->
+    <link rel="stylesheet" href="styles/main.css">
+  </head>
+  <body>
+
+  <div class="b-audio-player" data-audio-player>
+    <div class="b-audio-player__title" data-audio-player-title></div>
+    <label class="b-audio-player__file" data-audio-player-input>
+      <input type="file" accept="audio/*">
+      <span class="b-audio-player__file__text">Выбрать файл</span>
+    </label>
+    <div class="b-audio-player__controls-wrapper">
+      <button class="b-audio-player__play-pause" data-audio-player-play-pause>> ||</button>
+      <button class="b-audio-player__stop" data-audio-player-stop>S</button>
+    </div>
+
+    <div class="b-audio-player__visualizer__wrapper">
+      <canvas data-audio-player-canvas></canvas>
+      <div class="b-audio-player__timeline__wrapper" data-audio-player-timeline-wrapper>
+        <div class="b-audio-player__timeline" data-audio-player-timeline></div>
+        <div class="b-audio-player__timeline__bg" data-audio-player-timeline-bg></div>
+      </div>
+    </div>
+    <div class="b-audio-player__dnd-screen__wrapper" data-audio-player-dropzone>
+      <div class="b-audio-player__dnd-screen">Отпускайте</div>
+    </div>
+  </div>
+
+  <!--<canvas id="canvas"></canvas>-->
+    <!-- build:js scripts/main.min.js -->
+    <script src="scripts/libs/jquery-2.1.4.js"></script>
+    <script src="scripts/Sound.js"></script>
+    <script src="scripts/AudioPlayer.js"></script>
+    <!-- endbuild -->
+  </body>
+</html>
