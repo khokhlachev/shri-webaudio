@@ -103,7 +103,6 @@ window.AudioContext = window.AudioContext || window.webkitAudioContext;
             return false;
         }
 
-        this.state.paused = true;
         this.state.pausedAt = Date.now();
         this.stop(true);
     }
@@ -111,6 +110,8 @@ window.AudioContext = window.AudioContext || window.webkitAudioContext;
     Sound.prototype.stop = function (isPause) {
         this.media.sourceNode.stop();
         this._trackTimeStop();
+
+        this.state.paused = true;
 
         if (! isPause) {
             this.state.currentTime = 0;
@@ -126,7 +127,8 @@ window.AudioContext = window.AudioContext || window.webkitAudioContext;
             if (_this.state.currentTime >= _this.duration) {
                 _this.state.currentTime = _this.duration;
                 _this._trackTimeStop();
-
+                _this.stop();
+                
                 if (typeof _this.onended === 'function') {
                     _this.onended();
                 }
