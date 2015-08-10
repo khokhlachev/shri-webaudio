@@ -70,6 +70,41 @@ AudioPlayer.prototype._updateTitle = function (string) {
     this.$elements.$title.html(string);
 }
 
+AudioPlayer.prototype._initEQ = function () {
+    var _this = this;
+    var midFrequenciesToFilter = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    var eqFilters = [];
+
+    function _createFilter(frequency) {
+        var filter = _this.sound.audioCtx.createBiquadFilter();
+
+        filter.type = 'peaking';
+        filter.frequency.value = frequency;
+        filter.Q.value = 1;
+        filter.gain.value = 0;
+
+        return filter;
+    }
+
+    eqFilters = midFrequenciesToFilter.map(_createFilter);
+    eqFilters.reduce(function (prev, curr) {
+        prev.connect(curr);
+        return curr;
+    });
+
+    this.eq = {
+        connect: function () {
+            _this.sound.sourceNode.connect(eqFilters[0]);
+            eqFilters[eqFilters.length - 1].connect(_this.sound.audioCtx.destination);
+        },
+        set: function (i, value) {
+            eqFilters[i].gain.value = value;
+        }
+    };
+
+    this.eq.connect();
+}
+
 AudioPlayer.prototype._initVisual = function () {
     var _this = this;
     var analyser = this.sound.audioCtx.createAnalyser();
@@ -80,7 +115,6 @@ AudioPlayer.prototype._initVisual = function () {
     var capYPositionArray = [];
     var columnsCount = 64;
     var barWidth = Math.round(WIDTH / columnsCount);
-    var drawVisual;
     var allCapsHasFallen = false;
 
     canvas.width = WIDTH;
@@ -97,112 +131,146 @@ AudioPlayer.prototype._initVisual = function () {
 
     var bufferLength = analyser.frequencyBinCount;
     var freqDomain = new Uint8Array(bufferLength);
-    //var timeDomain = new Uint8Array(bufferLength);
+    var timeDomain = new Uint8Array(bufferLength);
     var step = Math.round(freqDomain.length / columnsCount);
 
     var gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
-    gradient.addColorStop(0.9, '#00ff00');
-    gradient.addColorStop(0.6, '#ffff00');
-    gradient.addColorStop(0, '#ff0000');
+    gradient.addColorStop(0.8, '#1944CD');
+    gradient.addColorStop(0.45, '#6A10CA');
+    gradient.addColorStop(0, '#CA1093');
 
-    //analyser.getByteFrequencyData(freqDomain);
-    //canvasCtx.fillStyle = 'rgb(0, 0, 0)';
-    //canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+    var animations = this.animations = {
+        currentAnimationId: null,
+        currentAnimationName: 'freqDomain',
+        connect: function () {
+            _this.sound.sourceNode.connect(analyser);
+            analyser.connect(_this.sound.audioCtx.destination);
+        },
+        resume: function () {
+            cancelAnimationFrame(animations.currentAnimationId);
+            this.loop();
+        },
+        freqDomain: function drawFrequencyDomain() {
+            console.log('drawFrequencyDomain');
+            analyser.getByteFrequencyData(freqDomain);
 
-    function drawFrequencyDomain() {
-        //console.log('drawFrequencyDomain');
-        analyser.getByteFrequencyData(freqDomain);
+            var barHeight;
+            var value;
+            var percent;
 
-        var barHeight;
-        var value;
-        var percent;
+            if (_this.sound.paused) {
+                for (var j = 0; j < freqDomain.length; j++) {
+                    freqDomain[j] = 0;
+                }
 
-        if (_this.sound.paused) {
-            for (var j = 0; j < freqDomain.length; j++) {
-                freqDomain[j] = 0;
+                allCapsHasFallen = true;
+
+                capYPositionArray.forEach(function (cap) {
+                    allCapsHasFallen = allCapsHasFallen && cap === 0;
+                });
+
+                if (allCapsHasFallen) {
+                    cancelAnimationFrame(animations.currentAnimationId);
+                    return false;
+                }
             }
 
-            allCapsHasFallen = true;
+            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
 
-            capYPositionArray.forEach(function (cap) {
-                allCapsHasFallen = allCapsHasFallen && cap === 0;
-            });
+            for (var i = 0; i < columnsCount; i++) {
+                value = freqDomain[i * step];
+                percent = value / 256;
+                barHeight = HEIGHT * percent;
 
-            //console.log('allCapsHasFallen', allCapsHasFallen);
+                if (capYPositionArray.length <= columnsCount) {
+                    capYPositionArray.push(barHeight);
+                }
 
-            if (allCapsHasFallen) {
-                console.log('allCapsHasFallen', allCapsHasFallen);
-                cancelAnimationFrame(drawVisual);
+                canvasCtx.fillStyle = 'rgb(' + (value + 100) + ', 50, 50)';
+
+                if (capYPositionArray[i] > barHeight) {
+                    canvasCtx.fillRect(i * (barWidth + 2), HEIGHT - (--capYPositionArray[i]), barWidth, 2);
+                } else {
+                    canvasCtx.fillRect(i * (barWidth + 2), HEIGHT, barWidth, 2);
+                    capYPositionArray[i] = barHeight;
+                }
+
+                canvasCtx.fillStyle = gradient;
+                canvasCtx.fillRect(i * (barWidth + 2), HEIGHT, barWidth, barHeight * -1);
+            }
+
+            animations.loop();
+        },
+        timeDomain: function drawTimeDomain() {
+            if (_this.sound.paused) {
+                cancelAnimationFrame(animations.currentAnimationId);
+                canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
                 return false;
             }
 
-        }
+            analyser.getByteTimeDomainData(timeDomain);
+            canvasCtx.fillStyle = 'rgb(200, 200, 200)';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = 'rgb(230, 230, 230)';
 
-        canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+            canvasCtx.beginPath();
 
-        for (var i = 0; i < columnsCount; i++) {
-            //console.log('i * step', i * step);
-            value = freqDomain[i * step];
-            //console.log('value', value);
-            percent = value / 256;
-            barHeight = HEIGHT * percent;
+            var sliceWidth = WIDTH * 1.0 / bufferLength;
+            var x = 0;
 
-            if (capYPositionArray.length <= columnsCount) {
-                capYPositionArray.push(barHeight);
+            canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
+            for (var i = 0; i < bufferLength; i++) {
+                var value = timeDomain[i] / 128;
+                var y = value * HEIGHT / 2;
+
+                if (i === 0) {
+                    canvasCtx.moveTo(x, y);
+                } else {
+                    canvasCtx.lineTo(x, y);
+                }
+
+                x += sliceWidth;
             }
 
-            canvasCtx.fillStyle = 'rgb(' + (value + 100) + ', 50, 50)';
+            canvasCtx.lineTo(WIDTH, HEIGHT / 2);
+            canvasCtx.stroke();
 
-            if (capYPositionArray[i] > barHeight) {
-                canvasCtx.fillRect(i * barWidth, HEIGHT - (--capYPositionArray[i]), barWidth, 2);
-            } else {
-                canvasCtx.fillRect(i * barWidth, HEIGHT, barWidth, 2);
-                capYPositionArray[i] = barHeight;
-            }
-
-            canvasCtx.fillStyle = gradient;
-            canvasCtx.fillRect(i * barWidth, HEIGHT, barWidth, barHeight * -1);
+            animations.loop();
+        },
+        loop: function () {
+            this.currentAnimationId = requestAnimationFrame(animations[animations.currentAnimationName]);
+        },
+        setFftSize: function (fftSize) {
+            analyser.fftSize = fftSize;
         }
-
-        drawVisual = requestAnimationFrame(drawFrequencyDomain);
     };
 
-    drawFrequencyDomain();
-
-    //function drawTimeDomain() {
-    //    drawVisual = requestAnimationFrame(drawTimeDomain);
-    //    analyser.getByteTimeDomainData(timeDomain);
-    //
-    //    canvasCtx.fillStyle = 'rgb(200, 200, 200)';
-    //    canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-    //    canvasCtx.lineWidth = 2;
-    //    canvasCtx.strokeStyle = 'rgb(10, 10, 10)';
-    //
-    //    canvasCtx.beginPath();
-    //    //
-    //    var sliceWidth = WIDTH * 1.0 / bufferLength;
-    //    var x = 0;
-    //
-    //    for (var i = 0; i < bufferLength; i++) {
-    //        var value = timeDomain[i] / 128;
-    //        var y = value * HEIGHT / 2;
-    //
-    //        if (i === 0) {
-    //            canvasCtx.moveTo(x, y);
-    //        } else {
-    //            canvasCtx.lineTo(x, y);
-    //        }
-    //
-    //        x += sliceWidth;
-    //    }
-    //
-    //
-    //    canvasCtx.lineTo(WIDTH, HEIGHT / 2);
-    //    canvasCtx.stroke();
-    //};
-
-    //drawTimeDomain();
+    animations.loop();
 };
+
+AudioPlayer.prototype.setAnimation = function (name) {
+    this.animations.currentAnimationName = name;
+
+    switch(name) {
+        case 'freqDomain':
+            this.animations.setFftSize(256);
+            break;
+        case 'timeDomain':
+            this.animations.setFftSize(2048);
+            break;
+        default:
+            return false;
+    }
+};
+
+AudioPlayer.prototype.swapAnimation = function () {
+    if (this.animations.currentAnimationName === 'freqDomain') {
+        this.setAnimation('timeDomain');
+    } else {
+        this.setAnimation('freqDomain');
+    }
+}
 
 AudioPlayer.prototype.play = function () {
 
@@ -212,7 +280,16 @@ AudioPlayer.prototype.play = function () {
     }
 
     this.sound.play();
-    this._initVisual();
+
+    if (this.animations && this.eq) {
+        this.eq.connect();
+        this.animations.connect();
+        this.animations.resume();
+    } else {
+        this._initEQ();
+        this._initVisual();
+    }
+
     this._setClassName('PLAY');
 }
 
@@ -299,11 +376,24 @@ AudioPlayer.prototype._initEvents = function () {
         }
     });
 
-    this.$elements.$timelineBg.on('mousedown', function (e) {
+    this.$elements.$timelineWrapper.on('mousedown', function (e) {
         _this._startSeek(e);
     });
-    this.$elements.$timelineBg.on('mouseleave mouseup', function () {
+    this.$elements.$timelineWrapper.on('mouseleave mouseup', function () {
         _this._stopSeek();
+    });
+
+    this.$elements.$visualizer.on('click', function () {
+        _this.swapAnimation();
+    });
+
+    this.$el.find('[data-audio-player-eq-control]').each(function (i, el) {
+        var $el = $(el);
+
+        $el.on('change', function (e) {
+            //console.log(e.target.value);
+            _this.eq.set(i, e.target.value - 50);
+        });
     });
 
     var dragCounter = 0;
@@ -349,7 +439,7 @@ AudioPlayer.prototype._initEvents = function () {
 AudioPlayer.prototype._startSeek = function (eDown) {
     console.log('_startSeek');
     var _this = this;
-    var timelineWidth = this.$elements.$timelineBg.width();
+    var timelineWidth = this.$elements.$timelineWrapper.width();
     var offsetLeft = this.$elements.$timelineWrapper[0].offsetLeft;
 
     function _changeTime(e) {
@@ -358,7 +448,7 @@ AudioPlayer.prototype._startSeek = function (eDown) {
 
     _changeTime(eDown);
 
-    this.$elements.$timelineBg.on('mousemove', function (eMove) {
+    this.$elements.$timelineWrapper.on('mousemove', function (eMove) {
         //_this.pause();
         _changeTime(eMove);
     });
@@ -372,7 +462,7 @@ AudioPlayer.prototype._startSeek = function (eDown) {
  */
 AudioPlayer.prototype._stopSeek = function () {
     //this.play();
-    this.$elements.$timelineBg.off('mousemove');
+    this.$elements.$timelineWrapper.off('mousemove');
 }
 
 /**
@@ -388,6 +478,9 @@ AudioPlayer.prototype._setTime = function (seconds) {
 
     console.log('_setTime');
     this.sound.setTime(seconds);
+
+    this.eq.connect();
+    this.animations.connect();
 }
 
 /**
@@ -413,7 +506,7 @@ AudioPlayer.prototype.destroy = function () {
 
 var $players = $('[data-audio-player]');
 $players.each(function () {
-    new AudioPlayer({
+    window.ThisPlayer = new AudioPlayer({
         $el: $(this)
     });
 });
