@@ -108,7 +108,7 @@ window.AudioContext = window.AudioContext || window.webkitAudioContext;
     }
 
     Sound.prototype.stop = function (isPause) {
-        this.media.sourceNode.stop();
+        this.media.sourceNode.stop(0);
         this._trackTimeStop();
 
         this.state.paused = true;
@@ -128,7 +128,7 @@ window.AudioContext = window.AudioContext || window.webkitAudioContext;
                 _this.state.currentTime = _this.duration;
                 _this._trackTimeStop();
                 _this.stop();
-                
+
                 if (typeof _this.onended === 'function') {
                     _this.onended();
                 }

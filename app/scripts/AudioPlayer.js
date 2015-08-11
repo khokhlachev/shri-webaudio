@@ -39,7 +39,8 @@ window.AudioPlayer = function AudioPlayer(options) {
             enabled: true,
             width: 600,
             height: 200
-        }
+        },
+        eqFrequenciesToFilter: [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
     };
 
     this.options = $.extend(defaults, options);
@@ -56,6 +57,7 @@ window.AudioPlayer = function AudioPlayer(options) {
 
     this._initMarkup();
     this._initEvents();
+    this._initEqSettingsStore();
 
     this.state = {
         title: null
@@ -70,9 +72,24 @@ AudioPlayer.prototype._updateTitle = function (string) {
     this.$elements.$title.html(string);
 }
 
+AudioPlayer.prototype._initEqSettingsStore = function () {
+    var _this = this;
+
+    this.eqSettingsStore = {
+        isDirty: false,
+        store: new Array(_this.options.eqFrequenciesToFilter.length),
+        set: function (i, value) {
+            console.log('value', value);
+            this.isDirty = true;
+            this.store[i] = value;
+            console.log('this.store[i]', this.store[i]);
+        }
+    }
+}
+
 AudioPlayer.prototype._initEQ = function () {
     var _this = this;
-    var midFrequenciesToFilter = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+    var eqFrequenciesToFilter = this.options.eqFrequenciesToFilter;
     var eqFilters = [];
 
     function _createFilter(frequency) {
@@ -86,14 +103,24 @@ AudioPlayer.prototype._initEQ = function () {
         return filter;
     }
 
-    eqFilters = midFrequenciesToFilter.map(_createFilter);
-    eqFilters.reduce(function (prev, curr) {
-        prev.connect(curr);
-        return curr;
-    });
-
     this.eq = {
+        getLastFilter: function () {
+            return eqFilters[eqFilters.length - 1];
+        },
         connect: function () {
+            eqFilters = eqFrequenciesToFilter.map(_createFilter);
+            eqFilters.reduce(function (prev, curr) {
+                prev.connect(curr);
+                return curr;
+            });
+            console.log('_this.eqSettingsStore.isDirty');
+            if (_this.eqSettingsStore.isDirty) {
+                _this.eqSettingsStore.store.forEach(function (value, i) {
+                    console.log('i, value', i, value);
+                    eqFilters[i].gain.value = value || 0;
+                });
+            }
+
             _this.sound.sourceNode.connect(eqFilters[0]);
             eqFilters[eqFilters.length - 1].connect(_this.sound.audioCtx.destination);
         },
@@ -107,43 +134,67 @@ AudioPlayer.prototype._initEQ = function () {
 
 AudioPlayer.prototype._initVisual = function () {
     var _this = this;
-    var analyser = this.sound.audioCtx.createAnalyser();
-    var WIDTH = this.options.visualizer.width;
-    var HEIGHT = this.options.visualizer.height;
+    var $window = $(window);
+    var WIDTH = $window.width() * 0.9;
+    var HEIGHT = $window.height() * 0.5;
     var canvas = this.$elements.$visualizer[0];
     var canvasCtx = canvas.getContext('2d');
+    var gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
     var capYPositionArray = [];
     var columnsCount = 64;
     var barWidth = Math.round(WIDTH / columnsCount);
     var allCapsHasFallen = false;
+    var analyser;
+    var bufferLength;
+    var freqDomain;
+    var timeDomain;
+    var step;
 
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
 
-    this.sound.sourceNode.connect(analyser);
-    analyser.connect(this.sound.audioCtx.destination);
+    function _createAnalyzer() {
+        analyser = _this.sound.audioCtx.createAnalyser();
 
-    analyser.fftSize = 256;
-    analyser.minDecibels = -90;
-    analyser.maxDecibels = -5;
-    analyser.smoothingTimeConstant = 0.85;
-    canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        //_this.sound.sourceNode.connect(analyser);
+        //analyser.connect(_this.sound.audioCtx.destination);
 
-    var bufferLength = analyser.frequencyBinCount;
-    var freqDomain = new Uint8Array(bufferLength);
-    var timeDomain = new Uint8Array(bufferLength);
-    var step = Math.round(freqDomain.length / columnsCount);
+        analyser.fftSize = 256;
+        analyser.minDecibels = -130;
+        analyser.maxDecibels = -10;
+        analyser.smoothingTimeConstant = 0.85;
 
-    var gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
-    gradient.addColorStop(0.8, '#1944CD');
-    gradient.addColorStop(0.45, '#6A10CA');
-    gradient.addColorStop(0, '#CA1093');
+        bufferLength = analyser.frequencyBinCount;
+
+        freqDomain = new Uint8Array(bufferLength);
+        timeDomain = new Uint8Array(bufferLength);
+        step = Math.round(freqDomain.length / columnsCount);
+    }
+
+    _createAnalyzer();
+
+    $window.on('resize', function () {
+        WIDTH = $window.width() * 0.9;
+        HEIGHT = $window.height() * 0.5;
+
+        canvas.width = WIDTH;
+        canvas.height = HEIGHT;
+    });
+
+    gradient.addColorStop(1, '#2352BA');
+    gradient.addColorStop(0.9, '#1944CD');
+    gradient.addColorStop(0.4, '#CA1093');
+    gradient.addColorStop(0, '#ff0000');
 
     var animations = this.animations = {
         currentAnimationId: null,
         currentAnimationName: 'freqDomain',
         connect: function () {
-            _this.sound.sourceNode.connect(analyser);
+            _createAnalyzer();
+
+            console.log('_this.eq', _this.eq);
+
+            (_this.eq.getLastFilter()).connect(analyser);
             analyser.connect(_this.sound.audioCtx.destination);
         },
         resume: function () {
@@ -158,7 +209,7 @@ AudioPlayer.prototype._initVisual = function () {
             var value;
             var percent;
 
-            if (_this.sound.paused) {
+            if (!_this.sound || _this.sound.paused) {
                 for (var j = 0; j < freqDomain.length; j++) {
                     freqDomain[j] = 0;
                 }
@@ -202,7 +253,7 @@ AudioPlayer.prototype._initVisual = function () {
             animations.loop();
         },
         timeDomain: function drawTimeDomain() {
-            if (_this.sound.paused) {
+            if (!_this.sound || _this.sound.paused) {
                 cancelAnimationFrame(animations.currentAnimationId);
                 canvasCtx.clearRect(0, 0, WIDTH, HEIGHT);
                 return false;
@@ -246,6 +297,7 @@ AudioPlayer.prototype._initVisual = function () {
         }
     };
 
+    animations.connect();
     animations.loop();
 };
 
@@ -299,6 +351,14 @@ AudioPlayer.prototype.pause = function () {
 }
 
 AudioPlayer.prototype.stop = function () {
+    if (! this.sound) {
+        return false;
+    }
+
+    this._clearClassName();
+    this._updateTitle('');
+    this._resetTimeline();
+
     this.sound.stop();
     this.sound = null;
 }
@@ -309,9 +369,11 @@ AudioPlayer.prototype._initMarkup = function () {
     this.$elements = {
         $title: _this.$el.find('[data-audio-player-title]'),
         $file: _this.$el.find('[data-audio-player-input]'),
+        $fileInput: _this.$el.find('[type=file]'),
         $visualizer: _this.$el.find('[data-audio-player-canvas]'),
         $dragAndDropScreen: _this.$el.find('[data-audio-player-dropzone]'),
         $play: _this.$el.find('[data-audio-player-play-pause]'),
+        $stop: _this.$el.find('[data-audio-player-stop]'),
         $timelineWrapper: _this.$el.find('[data-audio-player-timeline-wrapper]'),
         $timeline: _this.$el.find('[data-audio-player-timeline]'),
         $timelineBg: _this.$el.find('[data-audio-player-timeline-bg]')
@@ -329,6 +391,12 @@ AudioPlayer.prototype._setClassName = function (classNameConstant) {
 
     this.$el.removeClass(restClassNames.join(' '));
     this.$el.addClass(this.cssClasses[classNameConstant]);
+}
+
+AudioPlayer.prototype._clearClassName = function () {
+    for (key in this.cssClasses) {
+        this.$el.removeClass(this.cssClasses[key]);
+    }
 }
 
 AudioPlayer.prototype._initEvents = function () {
@@ -360,7 +428,7 @@ AudioPlayer.prototype._initEvents = function () {
         });
     }
 
-    this.$elements.$file.on('change', function () {
+    this.$elements.$fileInput.on('change', function () {
         if (! this.files.length) {
             return false;
         }
@@ -369,11 +437,20 @@ AudioPlayer.prototype._initEvents = function () {
     });
 
     this.$elements.$play.on('click', function () {
+        if (! _this.sound) {
+            _this.$elements.$file.trigger('click');
+            return false;
+        }
+
         if (_this.sound.paused) {
             _this.play();
         } else {
             _this.pause();
         }
+    });
+
+    this.$elements.$stop.on('click', function () {
+        _this.stop();
     });
 
     this.$elements.$timelineWrapper.on('mousedown', function (e) {
@@ -391,8 +468,11 @@ AudioPlayer.prototype._initEvents = function () {
         var $el = $(el);
 
         $el.on('change', function (e) {
-            //console.log(e.target.value);
-            _this.eq.set(i, e.target.value - 50);
+            _this.eqSettingsStore.set(i, e.target.value);
+
+            if (_this.sound) {
+                _this.eq.set(i, e.target.value); // [-12, +12]
+            }
         });
     });
 
@@ -498,6 +578,10 @@ AudioPlayer.prototype._setTimePerc = function (perc) {
 AudioPlayer.prototype._timelineUpdate = function () {
     var progress = this.sound.currentTime / this.sound.duration;
     this.$elements.$timeline.css('width', progress * 100 + '%');
+}
+
+AudioPlayer.prototype._resetTimeline = function () {
+    this.$elements.$timeline.css('width', 0);
 }
 
 AudioPlayer.prototype.destroy = function () {

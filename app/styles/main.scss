@@ -15,7 +15,7 @@ body {
   background-color: #fff;
   box-sizing: border-box;
   min-height: 100%;
-  background-color: #333333;
+  background-color: #222;
   color: white;
 }
 
@@ -23,22 +23,117 @@ body {
   height: 100%;
   width: 100%;
 
+  &__title {
+    position: absolute;
+    color: black;
+    z-index: 20;
+    line-height: 30px;
+    padding-left: 15px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
   &__file {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 35px;
+    height: 30px;
+
     input[type=file] {
       position: absolute;
       top: -9999px;
     }
 
-    &__text {
+    &__icon {
+      display: block;
+      background-color: #C0C0C0;
       cursor: pointer;
+      width: 35px;
+      height: 30px;
+      line-height: 30px;
+      text-align: center;
     }
   }
 
   &__visualizer {
     &__wrapper {
-      width: 600px;
-      height: 200px;
-      margin: 0 auto;
+      width: 90%;
+//      margin: 0 auto;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  }
+
+  &__top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 30px;
+    padding-left: 70px;
+    padding-right: 35px;
+  }
+
+  &__controls {
+    &-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 70px;
+    }
+  }
+
+  &__play-pause {
+    width: 35px;
+    height: 30px;
+    float: left;
+    border: none;
+    outline: none;
+
+    &:focus {
+      outline: none;
+    }
+
+    .is-on-play {
+      display: block;
+    }
+
+    .is-on-pause {
+      display: none;
+    }
+
+    .is-pause & {
+      .is-on-pause {
+        display: none;
+      }
+
+      .is-on-play {
+        display: block;
+      }
+    }
+
+    .is-play & {
+      .is-on-pause {
+        display: block;
+      }
+
+      .is-on-play {
+        display: none;
+      }
+    }
+  }
+
+  &__stop {
+    width: 35px;
+    height: 30px;
+    border: none;
+    outline: none;
+
+    &:focus {
+      outline: none;
     }
   }
 
@@ -50,18 +145,20 @@ body {
     z-index: 10;
 
     &__wrapper {
-      width: 100%;
       position: relative;
+      top: 0;
+      width: 100%;
       height: 30px;
-      top: -4px;
+      float: left;
     }
 
     &__bg {
       position: absolute;
       height: 30px;
       width: 100%;
-      background-color: gray;
+      background-color: #fff;
       z-index: 5;
+      opacity: 0.6;
     }
   }
 
@@ -84,7 +181,32 @@ body {
         display: table;
       }
     }
+  }
 
+  &__eq {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 100px;
+  }
+
+  &__eq-control {
+    position: relative;
+    float: left;
+    width: 40px;
+    height: 150px;
+
+    &__name {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    &__range {
+      transform: rotateZ(-90deg);
+      transform-origin: 50% 350%;
+    }
   }
 }
 
