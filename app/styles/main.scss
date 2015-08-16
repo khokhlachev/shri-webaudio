@@ -19,9 +19,17 @@ body {
   color: white;
 }
 
-.b-audio-player {
+.container {
+  min-width: 500px;
   height: 100%;
   width: 100%;
+}
+
+.b-audio-player {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 
   &__title {
     position: absolute;
@@ -188,6 +196,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
     top: 100px;
+    min-width: 350px;
   }
 
   &__eq-buttons {
@@ -213,7 +222,7 @@ body {
   &__eq-control {
     position: relative;
     float: left;
-    width: 40px;
+    width: 35px;
     height: 150px;
     padding-top: 30px;
     box-sizing: content-box;

@@ -120,7 +120,6 @@ AudioPlayer.prototype._initEQ = function () {
 
             if (_this.eqSettingsStore.isDirty) {
                 _this.eqSettingsStore.store.forEach(function (value, i) {
-                    console.log('i, value', i, value);
                     eqFilters[i].gain.value = value || 0;
                 });
             }
@@ -167,6 +166,8 @@ AudioPlayer.prototype._initVisual = function () {
     var gapWidth = 2;
     var barWidth = Math.round( (baseWindowWidth - baseColumnsCount * gapWidth) / baseColumnsCount);
     var allCapsHasFallen = false;
+    var isResizing = false;
+    var resizeTimeout;
     var analyser;
     var bufferLength;
     var freqDomain;
@@ -184,14 +185,11 @@ AudioPlayer.prototype._initVisual = function () {
      * @param {Number} ww
      */
     function _calcColumnsCount(ww) {
-        var widthDelta = Math.ceil(ww - baseWindowWidth);
-        var columnsDelta = Math.ceil(widthDelta / (barWidth + gapWidth));
+        var widthDelta = Math.round(ww - baseWindowWidth);
+        var columnsDelta = Math.round(widthDelta / (barWidth + gapWidth));
         var targetColumnsCount = baseColumnsCount + columnsDelta;
 
         columnsCount = targetColumnsCount >= minColumnsCount ? targetColumnsCount : minColumnsCount;
-
-        console.log('columnsCount', columnsCount);
-
     }
 
     _calcColumnsCount(WIDTH);
@@ -212,8 +210,6 @@ AudioPlayer.prototype._initVisual = function () {
     }
 
     _createAnalyzer();
-
-    console.log('freqDomain.length', freqDomain);
 
     $window.on('resize', function () {
         WIDTH = $window.width();
@@ -273,10 +269,6 @@ AudioPlayer.prototype._initVisual = function () {
 
             for (var i = 0; i < columnsCount; i++) {
                 value = freqDomain[i * step];
-
-                if (i * step > freqDomain.length) {
-                    console.log('i * step', i * step);
-                }
 
                 percent = value / 256;
                 barHeight = HEIGHT * percent;
@@ -549,7 +541,6 @@ AudioPlayer.prototype._initEvents = function () {
         dragCounter--;
 
         if (dragCounter === 0) {
-            console.log('dragleave');
             _this.$elements.$dragAndDropScreen.removeClass('is-shown');
         }
     });
@@ -579,7 +570,6 @@ AudioPlayer.prototype._initEvents = function () {
  * @private
  */
 AudioPlayer.prototype._startSeek = function (eDown) {
-    console.log('_startSeek');
     var _this = this;
     var timelineWidth = this.$elements.$timelineWrapper.width();
     var offsetLeft = this.$elements.$timelineWrapper[0].offsetLeft;
@@ -617,7 +607,6 @@ AudioPlayer.prototype._setTime = function (seconds) {
         return false;
     }
 
-    console.log('_setTime');
     this.sound.setTime(seconds);
 
     this.eq.connect();
