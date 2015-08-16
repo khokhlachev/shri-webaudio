@@ -58,12 +58,12 @@ body {
 
   &__visualizer {
     &__wrapper {
-      width: 90%;
+//      width: 90%;
 //      margin: 0 auto;
       position: absolute;
       bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
+//      left: 50%;
+//      transform: translateX(-50%);
     }
   }
 
@@ -190,11 +190,33 @@ body {
     top: 100px;
   }
 
+  &__eq-buttons {
+    &__button {
+      width: 20%;
+      float: left;
+      border: 1px solid #BFBFBF;
+      background-color: white;
+      color: black;
+      -webkit-appearance: none;
+      outline: none;
+
+      &.is-active {
+        background-color: #CBCBCB;
+      }
+
+      &:focus {
+        outline: none;
+      }
+    }
+  }
+
   &__eq-control {
     position: relative;
     float: left;
     width: 40px;
     height: 150px;
+    padding-top: 30px;
+    box-sizing: content-box;
 
     &__name {
       position: absolute;

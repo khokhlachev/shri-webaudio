@@ -63,9 +63,15 @@ window.AudioPlayer = function AudioPlayer(options) {
         title: null
     };
 
-    this.sound = null;
+    this.eqPresets = {
+        pop: [-2,-1,0,2,4,4,3,0,-1,-2],
+        rock: [5,4,3,2,-1,-2,1,2,4,5],
+        jazz: [5,4,2,3,-2,-2,0,2,4,5],
+        classic: [5,4,3,3,-2,-2,0,3,4,5],
+        normal: [0,0,0,0,0,0,0,0,0,0]
+    };
 
-    //return this;
+    this.sound = null;
 };
 
 AudioPlayer.prototype._updateTitle = function (string) {
@@ -79,10 +85,8 @@ AudioPlayer.prototype._initEqSettingsStore = function () {
         isDirty: false,
         store: new Array(_this.options.eqFrequenciesToFilter.length),
         set: function (i, value) {
-            console.log('value', value);
             this.isDirty = true;
             this.store[i] = value;
-            console.log('this.store[i]', this.store[i]);
         }
     }
 }
@@ -113,7 +117,7 @@ AudioPlayer.prototype._initEQ = function () {
                 prev.connect(curr);
                 return curr;
             });
-            console.log('_this.eqSettingsStore.isDirty');
+
             if (_this.eqSettingsStore.isDirty) {
                 _this.eqSettingsStore.store.forEach(function (value, i) {
                     console.log('i, value', i, value);
@@ -132,32 +136,68 @@ AudioPlayer.prototype._initEQ = function () {
     this.eq.connect();
 }
 
+AudioPlayer.prototype._setEqPreset = function (name) {
+
+    name = name.toLowerCase();
+
+    if (! this.eqPresets.hasOwnProperty(name)) {
+        console.log('there is not such a preset', name);
+        return false;
+    }
+
+    var _this = this;
+
+    this.eqPresets[name].forEach(function (value, i) {
+        $(_this.$elements.$eqControls[i]).val(value);
+    });
+}
+
 AudioPlayer.prototype._initVisual = function () {
     var _this = this;
     var $window = $(window);
-    var WIDTH = $window.width() * 0.9;
+    var WIDTH = $window.width();
     var HEIGHT = $window.height() * 0.5;
     var canvas = this.$elements.$visualizer[0];
     var canvasCtx = canvas.getContext('2d');
     var gradient = canvasCtx.createLinearGradient(0, 0, 0, HEIGHT);
     var capYPositionArray = [];
-    var columnsCount = 64;
-    var barWidth = Math.round(WIDTH / columnsCount);
+    var baseWindowWidth = 960;
+    var baseColumnsCount = 48;
+    var minColumnsCount = 10;
+    var gapWidth = 2;
+    var barWidth = Math.round( (baseWindowWidth - baseColumnsCount * gapWidth) / baseColumnsCount);
     var allCapsHasFallen = false;
     var analyser;
     var bufferLength;
     var freqDomain;
     var timeDomain;
     var step;
+    var columnsCount;
 
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
 
+    /**
+     * вычисляет количество
+     * колонок в зависимости
+     * от ширины экрана
+     * @param {Number} ww
+     */
+    function _calcColumnsCount(ww) {
+        var widthDelta = Math.ceil(ww - baseWindowWidth);
+        var columnsDelta = Math.ceil(widthDelta / (barWidth + gapWidth));
+        var targetColumnsCount = baseColumnsCount + columnsDelta;
+
+        columnsCount = targetColumnsCount >= minColumnsCount ? targetColumnsCount : minColumnsCount;
+
+        console.log('columnsCount', columnsCount);
+
+    }
+
+    _calcColumnsCount(WIDTH);
+
     function _createAnalyzer() {
         analyser = _this.sound.audioCtx.createAnalyser();
-
-        //_this.sound.sourceNode.connect(analyser);
-        //analyser.connect(_this.sound.audioCtx.destination);
 
         analyser.fftSize = 256;
         analyser.minDecibels = -130;
@@ -173,12 +213,18 @@ AudioPlayer.prototype._initVisual = function () {
 
     _createAnalyzer();
 
+    console.log('freqDomain.length', freqDomain);
+
     $window.on('resize', function () {
-        WIDTH = $window.width() * 0.9;
+        WIDTH = $window.width();
         HEIGHT = $window.height() * 0.5;
 
         canvas.width = WIDTH;
         canvas.height = HEIGHT;
+
+        _calcColumnsCount(WIDTH);
+
+        step = Math.round(freqDomain.length / columnsCount);
     });
 
     gradient.addColorStop(1, '#2352BA');
@@ -192,8 +238,6 @@ AudioPlayer.prototype._initVisual = function () {
         connect: function () {
             _createAnalyzer();
 
-            console.log('_this.eq', _this.eq);
-
             (_this.eq.getLastFilter()).connect(analyser);
             analyser.connect(_this.sound.audioCtx.destination);
         },
@@ -202,7 +246,6 @@ AudioPlayer.prototype._initVisual = function () {
             this.loop();
         },
         freqDomain: function drawFrequencyDomain() {
-            console.log('drawFrequencyDomain');
             analyser.getByteFrequencyData(freqDomain);
 
             var barHeight;
@@ -230,6 +273,11 @@ AudioPlayer.prototype._initVisual = function () {
 
             for (var i = 0; i < columnsCount; i++) {
                 value = freqDomain[i * step];
+
+                if (i * step > freqDomain.length) {
+                    console.log('i * step', i * step);
+                }
+
                 percent = value / 256;
                 barHeight = HEIGHT * percent;
 
@@ -240,14 +288,14 @@ AudioPlayer.prototype._initVisual = function () {
                 canvasCtx.fillStyle = 'rgb(' + (value + 100) + ', 50, 50)';
 
                 if (capYPositionArray[i] > barHeight) {
-                    canvasCtx.fillRect(i * (barWidth + 2), HEIGHT - (--capYPositionArray[i]), barWidth, 2);
+                    canvasCtx.fillRect(i * (barWidth + gapWidth), HEIGHT - (--capYPositionArray[i]), barWidth, gapWidth);
                 } else {
-                    canvasCtx.fillRect(i * (barWidth + 2), HEIGHT, barWidth, 2);
+                    canvasCtx.fillRect(i * (barWidth + gapWidth), HEIGHT, barWidth, gapWidth);
                     capYPositionArray[i] = barHeight;
                 }
 
                 canvasCtx.fillStyle = gradient;
-                canvasCtx.fillRect(i * (barWidth + 2), HEIGHT, barWidth, barHeight * -1);
+                canvasCtx.fillRect(i * (barWidth + gapWidth), HEIGHT, barWidth, barHeight * -1);
             }
 
             animations.loop();
@@ -376,7 +424,9 @@ AudioPlayer.prototype._initMarkup = function () {
         $stop: _this.$el.find('[data-audio-player-stop]'),
         $timelineWrapper: _this.$el.find('[data-audio-player-timeline-wrapper]'),
         $timeline: _this.$el.find('[data-audio-player-timeline]'),
-        $timelineBg: _this.$el.find('[data-audio-player-timeline-bg]')
+        $timelineBg: _this.$el.find('[data-audio-player-timeline-bg]'),
+        $eqControls: _this.$el.find('[data-audio-player-eq-control]'),
+        $eqPresetButtons: _this.$el.find('[data-audio-player-eq-preset]')
     };
 }
 
@@ -464,7 +514,7 @@ AudioPlayer.prototype._initEvents = function () {
         _this.swapAnimation();
     });
 
-    this.$el.find('[data-audio-player-eq-control]').each(function (i, el) {
+    this.$elements.$eqControls.each(function (i, el) {
         var $el = $(el);
 
         $el.on('change', function (e) {
@@ -474,6 +524,16 @@ AudioPlayer.prototype._initEvents = function () {
                 _this.eq.set(i, e.target.value); // [-12, +12]
             }
         });
+    });
+
+    this.$elements.$eqPresetButtons.on('click', function () {
+        var $this = $(this);
+        var preset = $this.data('audio-player-eq-preset');
+
+        $this.siblings().removeClass('is-active');
+        $this.addClass('is-active');
+
+        _this._setEqPreset(preset);
     });
 
     var dragCounter = 0;
@@ -594,7 +654,3 @@ $players.each(function () {
         $el: $(this)
     });
 });
-
-
-
-
