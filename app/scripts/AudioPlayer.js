@@ -565,6 +565,8 @@ AudioPlayer.prototype._initEvents = function () {
         e.stopPropagation();
         e.preventDefault();
 
+        dragCounter = 0;
+
         _handleNewFile(e.originalEvent.dataTransfer.files[0]);
         _this.$elements.$dragAndDropScreen.removeClass('is-shown');
     });
@@ -573,7 +575,7 @@ AudioPlayer.prototype._initEvents = function () {
 
 /**
  * старт перемотки
- * @param eDown
+ * @param {Event} eDown
  * @private
  */
 AudioPlayer.prototype._startSeek = function (eDown) {
@@ -592,7 +594,6 @@ AudioPlayer.prototype._startSeek = function (eDown) {
         //_this.pause();
         _changeTime(eMove);
     });
-
 
 }
 
